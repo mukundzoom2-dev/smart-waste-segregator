@@ -40,7 +40,9 @@ cd smart-waste-segregator
 python3 -m http.server 8000
 ```
 
-Then open <http://localhost:8000/webcam.html>.
+Then open `
+<img width="1600" height="1082" alt="arduino_uno_wiring" src="https://github.com/user-attachments/assets/5858ed8c-35c7-4558-b369-f0776fe05bf3" />
+http://localhost:8000/webcam.html`.
 
 ### Use it
 
@@ -81,8 +83,8 @@ These values are at the top of the script in `webcam.html`:
 
 <!-- TODO: The arduino ver/ folder wasn't visible when this README was drafted. Fill this in: -->
 
-- **Board:** [e.g. Arduino Uno]
-- **Components:** [e.g. servo motors, sensors, bins]
+- **Board:** Arduino UNO
+- **Components:** servo motors, breadboard, bins
 - **Wiring:** [add a diagram or pin table]
 - **How it connects to the classifier:** [e.g. serial messages from the browser, standalone sketch]
 
