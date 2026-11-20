@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Teachable Machine - Upload Image</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    #preview { max-width: 300px; max-height: 300px; display: none; margin: 12px 0; border: 1px solid #ccc; }
+    #result div { margin: 4px 0; }
+    #top { font-weight: bold; font-size: 1.2em; margin-top: 10px; }
+    #status { color: #b00; margin: 8px 0; }
+  </style>
+</head>
+<body>
+  <h3>Teachable Machine Image Model (upload a picture)</h3>
+  <input type="file" id="fileInput" accept="image/*">
+  <div id="status">Loading model...</div>
+  <img id="preview" alt="preview">
+  <div id="top"></div>
+  <div id="result"></div>
+
+  <!-- Pinned versions that match Teachable Machine's own export -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
+  <script>
+    const MODEL_URL = "https://teachablemachine.withgoogle.com/models/aye25JaQF/";
+    let model;
+    const statusEl = document.getElementById("status");
+    const preview = document.getElementById("preview");
+    const resultEl = document.getElementById("result");
+    const topEl = document.getElementById("top");
+
+    async function loadModel() {
+      try {
+        if (typeof tmImage === "undefined") {
+          throw new Error("Libraries did not load. Check your internet connection.");
+        }
+        model = await tmImage.load(MODEL_URL + "model.json", MODEL_URL + "metadata.json");
+        statusEl.style.color = "#080";
+        statusEl.textContent = "Model loaded. Choose an image.";
+      } catch (err) {
+        const detail = (err && (err.message || err.name)) || String(err) || "unknown error";
+        statusEl.textContent = "Failed while loading the model: " + detail;
+        console.error(err);
+      }
+    }
+
+    document.getElementById("fileInput").addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      if (!model) { statusEl.textContent = "Model is not loaded yet."; return; }
+      preview.onload = predict;
+      preview.src = URL.createObjectURL(file);
+      preview.style.display = "block";
+    });
+
+    async function predict() {
+      try {
+        const prediction = await model.predict(preview);
+        prediction.sort((a, b) => b.probability - a.probability);
+        topEl.textContent = "Result: " + prediction[0].className +
+          " (" + (prediction[0].probability * 100).toFixed(1) + "%)";
+        resultEl.innerHTML = "";
+        prediction.forEach(p => {
+          const d = document.createElement("div");
+          d.textContent = p.className + ": " + (p.probability * 100).toFixed(1) + "%";
+          resultEl.appendChild(d);
+        });
+      } catch (err) {
+        statusEl.style.color = "#b00";
+        statusEl.textContent = "Failed while predicting: " + ((err && err.message) || String(err));
+        console.error(err);
+      }
+    }
+
+    loadModel();
+  </script>
+</body>
+</html>
