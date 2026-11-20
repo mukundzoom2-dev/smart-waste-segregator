@@ -65,7 +65,7 @@ Then open `http://localhost:8000/webcam.html`.
 
 ### Classify a single picture
 
-`upload.html` lets you pick an image file and shows the prediction for each class. It loads the model from a hosted Teachable Machine link, so it needs an internet connection and doesn't use the files in `Model/`.
+`upload.html` lets you pick an image file and shows the prediction for each class.
 
 ## Training your own model
 
