@@ -1,33 +1,28 @@
-# Smart Waste Segregator
+# Image Model Tester
 
-A browser-based waste classification tool. It uses an image model trained with [Teachable Machine](https://teachablemachine.withgoogle.com/) to look at an item through your webcam and tell you which category of waste it belongs to. An optional Arduino Uno version lifts a servo-driven lid to sort the item into the right bin.
+A browser-based tool for trying out image models trained with [Teachable Machine](https://teachablemachine.withgoogle.com/). Upload your model, point your webcam at an item (or pick a picture), and it tells you which class the item belongs to.
 
 No backend is needed: the classification runs in the browser using TensorFlow.js.
 
 ## How it works
 
-1. You train an image classification model in Teachable Machine (one class per waste category) and export it as a TensorFlow.js model.
+1. You train an image classification model in Teachable Machine (one class per category) and export it as a TensorFlow.js model.
 2. You open `webcam.html` and upload the three exported model files.
 3. The page starts your webcam and shows live predictions for each class.
 4. Click **Evaluate**. For 5 seconds the page averages the model's predictions, then shows a popup with the winning class and its average match percentage.
 
 Averaging over a few seconds makes the final answer more stable than a single frame.
 
-The included model (`Model/`) has two classes: **Recyclable Waste** and **Non-Recyclable Waste**.
+It works with **any Teachable Machine image model**, with any number of classes. The included example model (`Model/`) has two classes: **Recyclable Waste** and **Non-Recyclable Waste**.
 
 ## Repository structure
 
 ```
 smart-waste-segregator/
-├── Model/                      # Exported Teachable Machine model files
-├── ARDUINO-VERSION/
-│   ├── waste_sorter/
-│   │   └── waste_sorter.ino    # Arduino sketch (two servo lifts)
-│   ├── webcam_arduino.html     # Webcam page that also talks to the Arduino
-│   └── arduino_uno_wiring.png  # Wiring diagram
-├── upload.html                 # Classify from an uploaded picture
-├── webcam.html                 # Live webcam classification page
-└── LICENSE                     # Apache-2.0
+├── Model/          # Exported Teachable Machine model files (example)
+├── upload.html     # Classify from an uploaded picture
+├── webcam.html     # Live webcam classification page
+└── LICENSE         # Apache-2.0
 ```
 
 ## Getting started
@@ -65,12 +60,12 @@ Then open `http://localhost:8000/webcam.html`.
 
 ### Classify a single picture
 
-`upload.html` lets you pick an image file and shows the prediction for each class.
+`upload.html` works like the webcam page. Choose the same three model files, then pick a picture and it shows the prediction for each class. The libraries still load from the internet, but the model comes from your own files.
 
 ## Training your own model
 
 1. Go to [Teachable Machine](https://teachablemachine.withgoogle.com/) and create a new **Image Project** (Standard image model).
-2. Create one class per waste category and add plenty of varied sample images of each.
+2. Create one class per category and add plenty of varied sample images of each.
 3. Train the model, then choose **Export Model** → **TensorFlow.js** → **Download**.
 4. Unzip the download. You will get `model.json`, `metadata.json` and `weights.bin`, which you upload in the page.
 
@@ -83,43 +78,6 @@ These values are at the top of the script in `webcam.html`:
 | `UPDATE_INTERVAL_MS` | `500` | How often the model runs on the webcam frame (ms) |
 | `EVAL_DURATION_MS` | `5000` | How long the Evaluate step collects predictions (ms) |
 
-## Hardware (Arduino version)
-
-The Arduino version sorts the item physically. After each Evaluate, the page sends a command over USB serial and the Arduino lifts the matching lid.
-
-- **Board:** Arduino Uno
-- **Components:** 2 servo motors, breadboard, bins, external 5V supply for the servos
-
-![Wiring diagram](ARDUINO-VERSION/arduino_uno_wiring.png)
-
-### Pin table
-
-| Connection | Arduino Uno pin |
-| --- | --- |
-| Servo 1 signal | D3 |
-| Servo 2 signal | D4 |
-| Servo power (V+) | External 5V supply (not the Arduino's 5V pin) |
-| Servo ground | Supply GND, joined to Arduino GND |
-
-The servos must share a common ground with the Arduino, otherwise the signal pins won't work reliably.
-
-### How it connects to the classifier
-
-- The page talks to the Arduino over USB serial at 9600 baud using the browser's Web Serial API.
-- Class 1 in the model sends `L1` (lift 1, servo on D3). Class 2 sends `L2` (lift 2, servo on D4).
-- On a command, the sketch raises the servo from 0° to 90°, holds for 3 seconds, lowers it, and replies `Lift N done`.
-- Only two classes are supported, one per lift.
-
-### Set it up
-
-1. Open `ARDUINO-VERSION/waste_sorter/waste_sorter.ino` in the Arduino IDE and upload it to the Uno.
-2. Wire the servos as shown above.
-3. Serve the repo (`python3 -m http.server 8000`) and open `http://localhost:8000/ARDUINO-VERSION/webcam_arduino.html` in **Chrome or Edge on a computer**. Web Serial isn't available in Firefox or Safari.
-4. Click **Connect Arduino**, choose the Arduino's port, and wait about 2 seconds for the board to restart.
-5. Use **Test lift 1** and **Test lift 2** to check the servos, then upload the model files, click **Start**, and **Evaluate**.
-
-You can change `REST_ANGLE`, `LIFT_ANGLE`, `HOLD_MS` and `STEP_DELAY_MS` at the top of the sketch to adjust the lift.
-
 ## Tips for better accuracy
 
 - Train with images taken in the same lighting and background you'll use at runtime.
@@ -131,7 +89,6 @@ You can change `REST_ANGLE`, `LIFT_ANGLE`, `HOLD_MS` and `STEP_DELAY_MS` at the 
 - [TensorFlow.js](https://www.tensorflow.org/js) 1.3.1
 - [@teachablemachine/image](https://github.com/googlecreativelab/teachablemachine-community) 0.8
 - Plain HTML, CSS and JavaScript
-- Arduino `Servo` library
 
 ## Contributing
 
