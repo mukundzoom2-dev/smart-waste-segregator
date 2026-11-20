@@ -1,79 +1,245 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="utf-8">
-  <title>Teachable Machine - Upload Image</title>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
-    #preview { max-width: 300px; max-height: 300px; display: none; margin: 12px 0; border: 1px solid #ccc; }
-    #result div { margin: 4px 0; }
-    #top { font-weight: bold; font-size: 1.2em; margin-top: 10px; }
-    #status { color: #b00; margin: 8px 0; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Smart Waste Segregator - Upload</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@100..900&display=swap" rel="stylesheet">
+<style>
+    body { font-family: 'Google Sans', 'Google Sans Flex', system-ui, sans-serif; margin: 2rem auto; max-width: 640px; padding: 0 1rem; text-align: center; }
+    button, input, code { font-family: inherit; }
+    code { font-family: ui-monospace, Consolas, monospace; }
+
+    .box { border: 1px solid #ccc; border-radius: 8px; padding: 1rem; margin: 1rem 0; }
+    .hint { color: #666; font-size: 0.9rem; margin-top: 0.5rem; }
+
+    .file-btn {
+        display: inline-block;
+        margin: 0.4rem 0;
+        padding: 0.5rem 1.2rem;
+        border-radius: 999px;
+        font-size: 0.95rem;
+        font-weight: 600;
+        cursor: pointer;
+        background: #6b7280;
+        color: #fff;
+        transition: background 0.2s;
+    }
+    .file-btn:hover { background: #4b5563; }
+    .file-btn.disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
+
+    #file-status div { margin: 2px 0; }
+    .ok { color: #1b7f3b; }
+    .missing { color: #b00020; }
+
+    #model-state { margin-top: 0.6rem; min-height: 1.2em; }
+    #model-state.err { color: #b00020; }
+    #model-state.ok { color: #1b7f3b; }
+
+    #preview {
+        display: none;
+        max-width: 100%;
+        max-height: 320px;
+        margin: 1rem auto 0;
+        border-radius: 28px;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+    }
+
+    #top { font-size: 1.4rem; font-weight: 600; margin-top: 1rem; }
+    #error { color: #b00020; margin-top: 1rem; }
+
+    #result { margin: 1rem auto 0; max-width: 420px; text-align: left; }
+    .row-item { margin: 8px 0; }
+    .row-head { display: flex; justify-content: space-between; font-size: 0.95rem; margin-bottom: 3px; }
+    .bar { height: 8px; border-radius: 999px; background: #e5e7eb; overflow: hidden; }
+    .bar > span { display: block; height: 100%; background: #6b7280; border-radius: 999px; }
+    .row-item.best .bar > span { background: #1b7f3b; }
+    .row-item.best .row-head { font-weight: 600; }
+</style>
 </head>
 <body>
-  <h3>Teachable Machine Image Model (upload a picture)</h3>
-  <input type="file" id="fileInput" accept="image/*">
-  <div id="status">Loading model...</div>
-  <img id="preview" alt="preview">
-  <div id="top"></div>
-  <div id="result"></div>
 
-  <!-- Pinned versions that match Teachable Machine's own export -->
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
-  <script>
-    const MODEL_URL = "https://teachablemachine.withgoogle.com/models/aye25JaQF/";
-    let model;
-    const statusEl = document.getElementById("status");
+<h2>Smart Waste Segregator</h2>
+
+<div class="box">
+    <label for="model-files"><strong>Upload your model files</strong></label><br>
+    <label for="model-files" class="file-btn">Choose Files</label>
+    <input type="file" id="model-files" multiple accept=".json,.bin" hidden>
+    <div class="hint">Select all three files at once: <code>model.json</code>, <code>metadata.json</code> and <code>weights.bin</code> (keep the original names).</div>
+    <div id="file-status">
+        <div id="st-model" class="missing">✗ model.json</div>
+        <div id="st-meta" class="missing">✗ metadata.json</div>
+        <div id="st-weights" class="missing">✗ weights.bin</div>
+    </div>
+    <div id="model-state"></div>
+</div>
+
+<div class="box">
+    <label for="image-file"><strong>Choose a picture</strong></label><br>
+    <label for="image-file" id="image-btn" class="file-btn disabled">Choose Image</label>
+    <input type="file" id="image-file" accept="image/*" hidden disabled>
+    <div class="hint">Upload the model files first. Then pick a photo of a waste item.</div>
+    <img id="preview" alt="Selected picture">
+    <div id="top"></div>
+    <div id="result"></div>
+</div>
+
+<div id="error"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
+<script type="text/javascript">
+    let model = null;
+    let loadId = 0;
+    let modelFile = null, metadataFile = null, weightsFile = null;
+    let previewUrl = null;
+
+    const fileInput = document.getElementById("model-files");
+    const imageInput = document.getElementById("image-file");
+    const imageBtn = document.getElementById("image-btn");
     const preview = document.getElementById("preview");
-    const resultEl = document.getElementById("result");
+    const modelState = document.getElementById("model-state");
+    const errorEl = document.getElementById("error");
     const topEl = document.getElementById("top");
+    const resultEl = document.getElementById("result");
 
-    async function loadModel() {
-      try {
-        if (typeof tmImage === "undefined") {
-          throw new Error("Libraries did not load. Check your internet connection.");
-        }
-        model = await tmImage.load(MODEL_URL + "model.json", MODEL_URL + "metadata.json");
-        statusEl.style.color = "#080";
-        statusEl.textContent = "Model loaded. Choose an image.";
-      } catch (err) {
-        const detail = (err && (err.message || err.name)) || String(err) || "unknown error";
-        statusEl.textContent = "Failed while loading the model: " + detail;
-        console.error(err);
-      }
+    function setStatus(id, file, label) {
+        const el = document.getElementById(id);
+        el.className = file ? "ok" : "missing";
+        el.textContent = (file ? "✓ " : "✗ ") + (file ? file.name : label);
     }
 
-    document.getElementById("fileInput").addEventListener("change", (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      if (!model) { statusEl.textContent = "Model is not loaded yet."; return; }
-      preview.onload = predict;
-      preview.src = URL.createObjectURL(file);
-      preview.style.display = "block";
+    function setModelState(text, kind) {
+        modelState.textContent = text;
+        modelState.className = kind || "";
+    }
+
+    function enableImage(on) {
+        imageInput.disabled = !on;
+        imageBtn.classList.toggle("disabled", !on);
+    }
+
+    function clearResult() {
+        topEl.textContent = "";
+        resultEl.innerHTML = "";
+    }
+
+    // Sort the selected files into model / metadata / weights by name
+    fileInput.addEventListener("change", () => {
+        modelFile = metadataFile = weightsFile = null;
+        for (const f of fileInput.files) {
+            const name = f.name.toLowerCase();
+            if (name.endsWith(".bin")) weightsFile = f;
+            else if (name.endsWith(".json") && name.includes("metadata")) metadataFile = f;
+            else if (name.endsWith(".json")) modelFile = f;
+        }
+        setStatus("st-model", modelFile, "model.json");
+        setStatus("st-meta", metadataFile, "metadata.json");
+        setStatus("st-weights", weightsFile, "weights.bin");
+
+        model = null;
+        enableImage(false);
+        clearResult();
+        errorEl.textContent = "";
+
+        if (modelFile && metadataFile && weightsFile) {
+            loadModel();
+        } else {
+            setModelState("", "");
+        }
     });
 
-    async function predict() {
-      try {
-        const prediction = await model.predict(preview);
-        prediction.sort((a, b) => b.probability - a.probability);
-        topEl.textContent = "Result: " + prediction[0].className +
-          " (" + (prediction[0].probability * 100).toFixed(1) + "%)";
-        resultEl.innerHTML = "";
-        prediction.forEach(p => {
-          const d = document.createElement("div");
-          d.textContent = p.className + ": " + (p.probability * 100).toFixed(1) + "%";
-          resultEl.appendChild(d);
-        });
-      } catch (err) {
-        statusEl.style.color = "#b00";
-        statusEl.textContent = "Failed while predicting: " + ((err && err.message) || String(err));
-        console.error(err);
-      }
+    // Load the uploaded model as soon as all three files are chosen
+    async function loadModel() {
+        const myLoad = ++loadId;
+        setModelState("Loading model...", "");
+        try {
+            if (typeof tmImage === "undefined") {
+                throw new Error("Libraries did not load. Check your internet connection.");
+            }
+            // Make sure the weights file name matches what model.json expects
+            const manifest = JSON.parse(await modelFile.text());
+            const expected = manifest.weightsManifest && manifest.weightsManifest[0] &&
+                manifest.weightsManifest[0].paths && manifest.weightsManifest[0].paths[0];
+            if (expected && expected.split("/").pop() !== weightsFile.name) {
+                throw new Error('model.json expects a weights file named "' + expected +
+                    '" but you selected "' + weightsFile.name + '". Rename the file and select it again.');
+            }
+
+            const loaded = await tmImage.loadFromFiles(modelFile, weightsFile, metadataFile);
+            if (myLoad !== loadId) return; // newer selection replaced this one
+            model = loaded;
+            setModelState("Model loaded. Choose a picture.", "ok");
+            enableImage(true);
+
+            // If a picture was already chosen, classify it with the new model
+            if (preview.src && preview.style.display === "block") predict();
+        } catch (e) {
+            if (myLoad !== loadId) return;
+            model = null;
+            setModelState("", "");
+            errorEl.textContent = "Error: " + ((e && (e.message || e.name)) || String(e));
+            console.error(e);
+        }
     }
 
-    loadModel();
-  </script>
+    imageInput.addEventListener("change", () => {
+        const file = imageInput.files[0];
+        if (!file) return;
+        if (!model) { errorEl.textContent = "Model is not loaded yet."; return; }
+        errorEl.textContent = "";
+        clearResult();
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+        previewUrl = URL.createObjectURL(file);
+        preview.onload = predict;
+        preview.src = previewUrl;
+        preview.style.display = "block";
+    });
+
+    // Run the picture through the image model and list every class
+    async function predict() {
+        if (!model) return;
+        try {
+            const prediction = await model.predict(preview);
+            prediction.sort((a, b) => b.probability - a.probability);
+
+            const best = prediction[0];
+            topEl.textContent = best.className + " (" + (best.probability * 100).toFixed(0) + "% match)";
+
+            resultEl.innerHTML = "";
+            prediction.forEach((p, i) => {
+                const pct = (p.probability * 100).toFixed(0);
+
+                const item = document.createElement("div");
+                item.className = "row-item" + (i === 0 ? " best" : "");
+
+                const head = document.createElement("div");
+                head.className = "row-head";
+                const name = document.createElement("span");
+                name.textContent = p.className;
+                const val = document.createElement("span");
+                val.textContent = pct + "%";
+                head.appendChild(name);
+                head.appendChild(val);
+
+                const bar = document.createElement("div");
+                bar.className = "bar";
+                const fill = document.createElement("span");
+                fill.style.width = pct + "%";
+                bar.appendChild(fill);
+
+                item.appendChild(head);
+                item.appendChild(bar);
+                resultEl.appendChild(item);
+            });
+        } catch (e) {
+            errorEl.textContent = "Error: " + ((e && (e.message || e.name)) || String(e));
+            console.error(e);
+        }
+    }
+</script>
+
 </body>
 </html>
